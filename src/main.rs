@@ -1,4 +1,4 @@
-use std::{fs::File, io::Read};
+use std::{fs::File, io::Read, path::PathBuf};
 use tytodb_client::{
     AlbaTypes, BIGINT, EMAIL, FLOAT, GEO, HUGE_INT, INT, LARGE_BYTES, ToAlbaAlbaTypes, U_HUGE_INT,
     UBIGINT, UINT, alba,
@@ -12,11 +12,10 @@ use tytodb_client::{
 };
 const COUNT: i32 = 10;
 fn main() {
+    let mut path: PathBuf = dirs::home_dir().expect("Could not find home directory");
+    path.push("TytoDB/.secret");
     let mut secret = [0u8; 32];
-    File::open("/home/theo/TytoDB/.secret")
-        .unwrap()
-        .read_exact(&mut secret)
-        .unwrap();
+    File::open(path).unwrap().read_exact(&mut secret).unwrap();
 
     let client = Client::connect("127.0.0.1:4287", secret).unwrap();
 
