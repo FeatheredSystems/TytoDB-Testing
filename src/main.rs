@@ -12,19 +12,26 @@ use tytodb_client::{
 };
 const COUNT: i32 = 10;
 fn main() {
+    // --- Setup ---
+    println!("\n=== TytoDB Test Routine ===\n");
+
     let mut path: PathBuf = dirs::home_dir().expect("Could not find home directory");
     path.push("TytoDB/.secret");
+
     let mut secret = [0u8; 32];
     File::open(path).unwrap().read_exact(&mut secret).unwrap();
 
     let client = Client::connect("127.0.0.1:4287", secret).unwrap();
+    println!("[+] Connected to server");
 
+    // --- Container creation ---
     let _ = client.execute(
         DeleteContainerBuilder::new()
             .put_container("CCCCCC".to_string())
             .finish()
             .unwrap(),
     );
+    println!("[*] Dropped old container (if existed)");
 
     client
         .execute(
@@ -45,9 +52,10 @@ fn main() {
                 .unwrap(),
         )
         .unwrap();
+    println!("[+] Created container CCCCCCC");
 
+    // --- Insert rows ---
     let mut batch = BatchBuilder::new().transaction(true);
-
     for i in 0..COUNT {
         let b: Vec<u8> = i.to_le_bytes().to_vec();
         batch = batch.push(
@@ -61,18 +69,15 @@ fn main() {
                 .insert_value("f".to_string(), AlbaTypes::I32(i))
                 .insert_value("g".to_string(), AlbaTypes::U32(i as u32))
                 .insert_value("h".to_string(), AlbaTypes::Bytes(b.clone()))
-                .insert_value(
-                    "i".to_string(),
-                    AlbaTypes::String(String::from_utf8_lossy(&b).to_string()),
-                )
+                .insert_value("i".to_string(), AlbaTypes::String(String::from_utf8_lossy(&b).to_string()))
                 .insert_value("j".to_string(), AlbaTypes::Geo((i as f64, i as f64)))
-                .insert_value(
-                    "k".to_string(),
-                    AlbaTypes::String(String::from_utf8_lossy(&b).to_string()),
-                ),
+                .insert_value("k".to_string(), AlbaTypes::String(String::from_utf8_lossy(&b).to_string())),
         );
     }
     client.execute(batch.finish().unwrap()).unwrap();
+    println!("[+] Inserted {COUNT} rows");
+
+    // --- Edit rows ---
     let mut edit_batch = BatchBuilder::new().transaction(true);
     for i in 0..COUNT {
         let b: Vec<u8> = i.to_le_bytes().to_vec();
@@ -87,24 +92,16 @@ fn main() {
                 .edit_column("f".to_string(), AlbaTypes::I32(i * 2))
                 .edit_column("g".to_string(), AlbaTypes::U32((i * 2) as u32))
                 .edit_column("h".to_string(), AlbaTypes::Bytes(b.clone()))
-                .edit_column(
-                    "i".to_string(),
-                    AlbaTypes::String(String::from_utf8_lossy(&b).to_string()),
-                )
-                .edit_column(
-                    "j".to_string(),
-                    AlbaTypes::Geo(((i * 2) as f64, (i * 2) as f64)),
-                )
-                .edit_column(
-                    "k".to_string(),
-                    AlbaTypes::String(String::from_utf8_lossy(&b).to_string()),
-                )
+                .edit_column("i".to_string(), AlbaTypes::String(String::from_utf8_lossy(&b).to_string()))
+                .edit_column("j".to_string(), AlbaTypes::Geo(((i * 2) as f64, (i * 2) as f64)))
+                .edit_column("k".to_string(), AlbaTypes::String(String::from_utf8_lossy(&b).to_string()))
                 .add_conditions(("a".to_string(), lo!(=), AlbaTypes::U64(i as u64)), true),
         );
     }
     client.execute(edit_batch.finish().unwrap()).unwrap();
+    println!("[+] Edited rows");
 
-    // Fetch all rows once
+    // --- Verify rows ---
     for i in 0..COUNT {
         let s = SearchBuilder::new()
             .add_container(String::from("CCCCCC"))
@@ -113,7 +110,9 @@ fn main() {
         let r = client.execute(s.finish().unwrap()).unwrap();
         assert_eq!(r.row_list.len(), 1);
     }
+    println!("[+] Verified row edits");
 
+    // --- Delete half the rows ---
     let _ = client
         .execute(
             BatchBuilder::new()
@@ -127,34 +126,30 @@ fn main() {
                 .unwrap(),
         )
         .unwrap();
+    println!("[*] Deleted half the rows");
 
+    // --- Final verification ---
     let all_rows = client
         .execute(
             SearchBuilder::new()
                 .add_container("CCCCCC".to_string())
                 .add_column_name("a".to_string())
-                .add_column_name("b".to_string())
-                .add_column_name("c".to_string())
-                .add_column_name("d".to_string())
-                .add_column_name("e".to_string())
-                .add_column_name("f".to_string())
-                .add_column_name("g".to_string())
-                .add_column_name("h".to_string())
-                .add_column_name("i".to_string())
-                .add_column_name("j".to_string())
-                .add_column_name("k".to_string())
                 .finish()
                 .unwrap(),
         )
         .unwrap();
     assert_eq!((COUNT / 2) as usize + 1, all_rows.row_list.len());
+    println!("[+] Final verification passed ({} rows)", all_rows.row_list.len());
 
+    // --- Cleanup ---
     let _ = client.execute(
         DeleteContainerBuilder::new()
             .put_container("CCCCCC".to_string())
             .finish()
             .unwrap(),
     );
+    println!("[*] Dropped container");
 
-    println!("finished testing successfully");
+    println!("\n=== Finished testing successfully ===\n");
 }
+
