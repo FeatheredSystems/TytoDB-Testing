@@ -281,7 +281,9 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 
 [[package]]
 name = "tytodb-client"
-version = "0.1.2"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6aef32b9db8bfdc072076491cb504fe3c2dbb40d68460aea80de906b41835de"
 dependencies = [
  "falcotcp",
 ]
